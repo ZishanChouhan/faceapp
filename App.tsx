@@ -16,6 +16,7 @@ import {
   useColorScheme,
   View,
   NativeModules,
+  PermissionsAndroid
 } from 'react-native';
 
 import {
@@ -35,8 +36,21 @@ function App(): JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
   const { FacemeshModule } = NativeModules 
 
-  const openCamera = () =>{
-    FacemeshModule.openCamera()
+  const openCamera = () => {
+    PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA).then(res => {
+      console.log("res", res);
+      if(res){
+        FacemeshModule.openCamera()
+      }else{
+        PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA).then(response => {
+          console.log("response", response)
+          if(response == PermissionsAndroid.RESULTS.GRANTED){
+            FacemeshModule.openCamera()
+          }
+      }).catch(err => console.log("err", err))
+    }
+
+    }).catch(err => console.log("err", err))
   }
 
   return (
