@@ -2,9 +2,13 @@ package com.faceapp;
 
 import static androidx.core.content.ContentProviderCompat.requireContext;
 
+import static com.faceapp.FaceLandmarkerHelper.TAG;
+
 import android.content.Context;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,9 +27,13 @@ import com.faceapp.databinding.CameraLayoutBinding;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mediapipe.tasks.vision.core.RunningMode;
 
+import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import kotlin.UninitializedPropertyAccessException;
 
 public class CameraActivity extends AppCompatActivity {
     CameraLayoutBinding cameraLayoutBinding;
@@ -145,7 +153,171 @@ public class CameraActivity extends AppCompatActivity {
         }
     }
 
+    void initBottomSheetControls() {
+        // init bottom sheet settings
+        cameraLayoutBinding.bottomSheetLayout.maxFacesValue.setText(
+                Integer.toString(viewModel.getCurrentMaxFaces())
+        );
+        cameraLayoutBinding.bottomSheetLayout.detectionThresholdValue.setText(
+                String.format(
+                        Locale.US, "%.2f", viewModel.getCurrentMinFaceDetectionConfidence()
+                ));
+        cameraLayoutBinding.bottomSheetLayout.trackingThresholdValue.setText(
+                String.format(
+                        Locale.US, "%.2f", viewModel.getCurrentMinFaceTrackingConfidence()
+                ));
+        cameraLayoutBinding.bottomSheetLayout.presenceThresholdValue.setText(
+                String.format(
+                        Locale.US, "%.2f", viewModel.getCurrentMinFacePresenceConfidence()
+                ));
 
+        // When clicked, lower face detection score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.detectionThresholdMinus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFaceDetectionConfidence >= 0.2) {
+                    faceLandmarkerHelper.minFaceDetectionConfidence -= 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, raise face detection score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.detectionThresholdPlus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFaceDetectionConfidence <= 0.8) {
+                    faceLandmarkerHelper.minFaceDetectionConfidence += 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, lower face tracking score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.trackingThresholdMinus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFaceTrackingConfidence >= 0.2) {
+                    faceLandmarkerHelper.minFaceTrackingConfidence -= 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, raise face tracking score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.trackingThresholdPlus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFaceTrackingConfidence <= 0.8) {
+                    faceLandmarkerHelper.minFaceTrackingConfidence += 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+
+        // When clicked, lower face presence score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.presenceThresholdMinus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFacePresenceConfidence >= 0.2) {
+                    faceLandmarkerHelper.minFacePresenceConfidence -= 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, raise face presence score threshold floor
+        cameraLayoutBinding.bottomSheetLayout.presenceThresholdPlus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.minFacePresenceConfidence <= 0.8) {
+                    faceLandmarkerHelper.minFacePresenceConfidence += 0.1f;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, reduce the number of faces that can be detected at a
+        // time
+        cameraLayoutBinding.bottomSheetLayout.maxFacesMinus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.maxNumFaces > 1) {
+                    faceLandmarkerHelper.maxNumFaces--;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, increase the number of faces that can be detected
+        // at a time
+        cameraLayoutBinding.bottomSheetLayout.maxFacesPlus.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (faceLandmarkerHelper.maxNumFaces < 2) {
+                    faceLandmarkerHelper.maxNumFaces++;
+                    updateControlsUi();
+                }
+            }
+        });
+
+        // When clicked, change the underlying hardware used for inference.
+        // Current options are CPU and GPU
+        cameraLayoutBinding.bottomSheetLayout.spinnerDelegate.setSelection(
+                viewModel.getCurrentDelegate(), false
+        );
+        cameraLayoutBinding.bottomSheetLayout.spinnerDelegate.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                try {
+                    faceLandmarkerHelper.currentDelegate = position;
+                    updateControlsUi();
+                } catch(UninitializedPropertyAccessException e) {
+                    Log.e(TAG, "FaceLandmarkerHelper has not been initialized yet.");
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+    }
+
+    void updateControlsUi() {
+        cameraLayoutBinding.bottomSheetLayout.maxFacesValue.setText(
+                Integer.toString(faceLandmarkerHelper.maxNumFaces));
+        cameraLayoutBinding.bottomSheetLayout.detectionThresholdValue.setText(
+                String.format(
+                        Locale.US,
+                        "%.2f",
+                        faceLandmarkerHelper.minFaceDetectionConfidence
+                ));
+        cameraLayoutBinding.bottomSheetLayout.trackingThresholdValue.setText(
+                String.format(
+                        Locale.US,
+                        "%.2f",
+                        faceLandmarkerHelper.minFaceTrackingConfidence
+                ));
+        cameraLayoutBinding.bottomSheetLayout.presenceThresholdValue.setText(
+                String.format(
+                        Locale.US,
+                        "%.2f",
+                        faceLandmarkerHelper.minFacePresenceConfidence
+                ));
+
+        // Needs to be cleared instead of reinitialized because the GPU
+        // delegate needs to be initialized on the thread using it when applicable
+        cameraExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                faceLandmarkerHelper.clearFaceLandmarker();
+                faceLandmarkerHelper.setupFaceLandmarker();
+            }
+        });
+        cameraLayoutBinding.overlay.clear();
+    }
 
     private void takePhoto() {
 
@@ -236,7 +408,11 @@ public class CameraActivity extends AppCompatActivity {
 
         cameraLayoutBinding = null;
         // Shut down our background executor
-        cameraExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        try {
+            cameraExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 //    companion object {
