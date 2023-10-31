@@ -3,7 +3,7 @@ package com.faceapp;
 import androidx.lifecycle.ViewModel;
 
 public final class MainViewModel extends ViewModel {
-    private int _delegate;
+    private int _delegate = 0;
     private float _minFaceDetectionConfidence = 0.5F;
     private float _minFaceTrackingConfidence = 0.5F;
     private float _minFacePresenceConfidence = 0.5F;

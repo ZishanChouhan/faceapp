@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import kotlin.UninitializedPropertyAccessException;
 
-public class CameraActivity extends AppCompatActivity {
+public class CameraActivity extends AppCompatActivity implements FaceLandmarkerHelper.LandmarkerListener {
     CameraLayoutBinding cameraLayoutBinding;
     ImageCapture imageCapture;
 
@@ -83,6 +83,7 @@ public class CameraActivity extends AppCompatActivity {
 //        cameraExecutor.execute(new Runnable() {
 //            @Override
 //            public void run() {
+        try{
                 faceLandmarkerHelper = new FaceLandmarkerHelper(
                         viewModel.getCurrentMinFaceDetectionConfidence(),
                         viewModel.getCurrentMinFaceTrackingConfidence(),
@@ -93,6 +94,9 @@ public class CameraActivity extends AppCompatActivity {
                         (Context) this,
                         (FaceLandmarkerHelper.LandmarkerListener) this
                 );
+        }catch (Exception e){
+            e.printStackTrace();
+        }
 //            }
 //        });
 
@@ -413,6 +417,21 @@ public class CameraActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void onError(@NonNull String var1, int var2) {
+
+    }
+
+    @Override
+    public void onResults(@NonNull FaceLandmarkerHelper.ResultBundle var1) {
+
+    }
+
+    @Override
+    public void onEmpty() {
+
     }
 
 //    companion object {

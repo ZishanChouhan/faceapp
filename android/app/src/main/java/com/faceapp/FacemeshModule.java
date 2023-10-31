@@ -10,9 +10,9 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
-import com.google.mlkit.vision.facemesh.FaceMeshDetection;
-import com.google.mlkit.vision.facemesh.FaceMeshDetector;
-import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions;
+//import com.google.mlkit.vision.facemesh.FaceMeshDetection;
+//import com.google.mlkit.vision.facemesh.FaceMeshDetector;
+//import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions;
 
 import java.util.Map;
 import java.util.HashMap;
