@@ -1,21 +1,22 @@
 package com.faceapp;
 
-import static androidx.core.content.ContentProviderCompat.requireContext;
-
-import static com.faceapp.FaceLandmarkerHelper.TAG;
+import static androidx.viewpager2.widget.ViewPager2.SCROLL_STATE_DRAGGING;
 
 import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.content.ContextCompat;
@@ -47,20 +48,28 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
     FaceLandmarkerHelper faceLandmarkerHelper;
     FaceBlendshapesResultAdapter faceBlendshapesResultAdapter;
 
+    int cameraFacing = CameraSelector.LENS_FACING_FRONT;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Log.d("FaceappSee", "OnCreate");
         cameraLayoutBinding = CameraLayoutBinding.inflate(getLayoutInflater());
+        Log.d("FaceappSee", cameraLayoutBinding.toString());
         setContentView(cameraLayoutBinding.getRoot());
 
         viewModel = new MainViewModel();
+
+        Log.d("FaceappSee", viewModel.toString());
         // Request camera permissions
 //        if (allPermissionsGranted()) {
 
         RecyclerView recyclerView = cameraLayoutBinding.recyclerviewResults;
+
         recyclerView.setLayoutManager( new LinearLayoutManager(this));
         recyclerView.setAdapter(faceBlendshapesResultAdapter);
-
+        Log.d("FaceappSee", recyclerView.toString());
         // Initialize our background executor
         cameraExecutor = Executors.newSingleThreadExecutor();
 
@@ -69,6 +78,7 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
             @Override
             public void run() {
                 try {
+
                     startCamera();
                 } catch (ExecutionException e) {
                     throw new RuntimeException(e);
@@ -94,6 +104,8 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
                         (Context) this,
                         (FaceLandmarkerHelper.LandmarkerListener) this
                 );
+
+                Log.d("FaceappSee", faceLandmarkerHelper.toString());
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -127,12 +139,14 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
     @Override
     public void onResume() {
         super.onResume();
+
+        Log.d("FaceappSee", "onResume: ");
         cameraExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                if (faceLandmarkerHelper.isClose()) {
+//                if (faceLandmarkerHelper.isClose()) {
                     faceLandmarkerHelper.setupFaceLandmarker();
-                }
+//                }
             }
         });
     }
@@ -278,7 +292,7 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
                     faceLandmarkerHelper.currentDelegate = position;
                     updateControlsUi();
                 } catch(UninitializedPropertyAccessException e) {
-                    Log.e(TAG, "FaceLandmarkerHelper has not been initialized yet.");
+                    Log.e("faceapp", "FaceLandmarkerHelper has not been initialized yet.");
                 }
             }
 
@@ -317,7 +331,7 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
             @Override
             public void run() {
                 faceLandmarkerHelper.clearFaceLandmarker();
-                faceLandmarkerHelper.setupFaceLandmarker();
+//                faceLandmarkerHelper.setupFaceLandmarker();
             }
         });
         cameraLayoutBinding.overlay.clear();
@@ -338,7 +352,9 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
                 // Used to bind the lifecycle of cameras to the lifecycle owner
                 try {
                     ProcessCameraProvider  cameraProvider = cameraProviderFuture.get();
+                    Log.d("FaceappSee", cameraProvider.toString());
                     bindPreview(cameraProvider);
+
 
                 } catch (ExecutionException e) {
                     throw new RuntimeException(e);
@@ -363,7 +379,10 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
     }
 
     public void bindPreview(@NonNull ProcessCameraProvider cameraProvider){
-        Preview preview = new Preview.Builder().build();
+        Preview preview = new Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetRotation(cameraLayoutBinding.viewFinder.getDisplay().getRotation())
+                .build();
 
 //                                .also {
 //                            it.setSurfaceProvider(cameraLayoutBinding.viewFinder.surfaceProvider)
@@ -375,9 +394,23 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
 //                                .build();
 
         ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetRotation(cameraLayoutBinding.viewFinder.getDisplay().getRotation())
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build();
 
-        ImageCapture.Builder builder = new ImageCapture.Builder();
+        Log.d("FaceappSee", imageAnalysis.toString());
+        imageAnalysis.setAnalyzer(cameraExecutor, new ImageAnalysis.Analyzer() {
+            @Override
+            public void analyze(@NonNull ImageProxy image) {
+                detectFace(image);
+            }
+        });
+
+        cameraProvider.unbindAll();
+
+//        ImageCapture.Builder builder = new ImageCapture.Builder();
 
 //                        HdrImageCaptureExtender hdrImageCaptureExtender = HdrImageCaptureExtender.create(builder);
 
@@ -386,17 +419,14 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
 //                            hdrImageCaptureExtender.enableExtension(cameraSelector);
 //                        }
 
-        imageCapture = builder
-                .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation())
-                .build();
+//        imageCapture = builder
+//                .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation())
+//                .build();
 
         preview.setSurfaceProvider(cameraLayoutBinding.viewFinder.getSurfaceProvider());
         Camera camera = cameraProvider
-                .bindToLifecycle((LifecycleOwner)this, cameraSelector, preview, imageAnalysis, imageCapture);
-
-
+                .bindToLifecycle((LifecycleOwner)this, cameraSelector, preview, imageAnalysis);
     }
-
 
 //    private fun requestPermissions() {}
 
@@ -405,6 +435,11 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
 //                baseContext, it) == PackageManager.PERMISSION_GRANTED
 //    }
 
+    private void detectFace(ImageProxy imageProxy) {
+
+        faceLandmarkerHelper.detectLiveStream(imageProxy, cameraFacing == CameraSelector.LENS_FACING_FRONT ? true : false
+        );
+    }
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -420,18 +455,63 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
     }
 
     @Override
-    public void onError(@NonNull String var1, int var2) {
+    public void onError(@NonNull String error, int errorCode) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getApplicationContext(), error, Toast.LENGTH_SHORT).show();
+                faceBlendshapesResultAdapter.updateResults(null);
+                faceBlendshapesResultAdapter.notifyDataSetChanged();
 
-    }
+                if (errorCode == FaceLandmarkerHelper.GPU_ERROR) {
+                    cameraLayoutBinding.bottomSheetLayout.spinnerDelegate.setSelection(
+                            FaceLandmarkerHelper.DELEGATE_CPU, false
+                    );
+                }
+            }
+        });
+    };
 
     @Override
-    public void onResults(@NonNull FaceLandmarkerHelper.ResultBundle var1) {
+    public void onResults(@NonNull FaceLandmarkerHelper.ResultBundle resultBundle) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (cameraLayoutBinding != null) {
+                    if (cameraLayoutBinding.recyclerviewResults.getScrollState() != SCROLL_STATE_DRAGGING) {
+                        faceBlendshapesResultAdapter.updateResults(resultBundle.getResult());
+                        faceBlendshapesResultAdapter.notifyDataSetChanged();
+                    }
 
-    }
+                    cameraLayoutBinding.bottomSheetLayout.inferenceTimeVal.setText(
+                            String.format("%d ms", resultBundle.getInferenceTime())
+                    );
+
+                    // Pass necessary information to OverlayView for drawing on the canvas
+                    cameraLayoutBinding.overlay.setResults(
+                            resultBundle.getResult(),
+                            resultBundle.getInputImageHeight(),
+                            resultBundle.getInputImageWidth(),
+                            RunningMode.LIVE_STREAM
+                    );
+                    cameraLayoutBinding.overlay.invalidate();
+                }
+            }
+        });
+    };
 
     @Override
     public void onEmpty() {
+        cameraLayoutBinding.overlay.clear();
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                faceBlendshapesResultAdapter.updateResults(null);
+                faceBlendshapesResultAdapter.notifyDataSetChanged();
+            }
+        });
 
+        }
     }
 
 //    companion object {
@@ -448,4 +528,4 @@ public class CameraActivity extends AppCompatActivity implements FaceLandmarkerH
 //        }.toTypedArray()
 //    }
 //}
-}
+//}

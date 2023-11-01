@@ -7,6 +7,8 @@ import android.graphics.Bitmap.Config;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.SystemClock;
+import android.util.Log;
+
 import androidx.annotation.VisibleForTesting;
 import androidx.camera.core.ImageInfo;
 import androidx.camera.core.ImageProxy;
@@ -46,8 +48,8 @@ public final class FaceLandmarkerHelper {
     @NotNull
     public static final String TAG = "FaceLandmarkerHelper";
     private static final String MP_FACE_LANDMARKER_TASK = "face_landmarker.task";
-    public static final int DELEGATE_CPU = 0;
-    public static final int DELEGATE_GPU = 1;
+    public final static int DELEGATE_CPU = 0;
+    public final static int DELEGATE_GPU = 1;
     public static final float DEFAULT_FACE_DETECTION_CONFIDENCE = 0.5F;
     public static final float DEFAULT_FACE_TRACKING_CONFIDENCE = 0.5F;
     public static final float DEFAULT_FACE_PRESENCE_CONFIDENCE = 0.5F;
@@ -66,12 +68,82 @@ public final class FaceLandmarkerHelper {
         this.faceLandmarker = null;
     }
 
-    public final boolean isClose() {
+    public boolean isClose() {
         return this.faceLandmarker == null;
     }
 
     public void setupFaceLandmarker() {
-        // $FF: Couldn't be decompiled
+        Log.d("FaceappSee", "setupFaceLandmarker: ");
+        BaseOptions.Builder baseOptionBuilder = BaseOptions.builder();
+
+        switch(currentDelegate) {
+            case DELEGATE_CPU :
+                baseOptionBuilder.setDelegate(Delegate.CPU);
+                break;
+
+            case DELEGATE_GPU :
+                baseOptionBuilder.setDelegate(Delegate.GPU);
+                break;
+
+            default: break;
+        }
+
+        Log.d("FaceappSee", baseOptionBuilder.toString());
+        baseOptionBuilder.setModelAssetPath(MP_FACE_LANDMARKER_TASK);
+
+        switch(runningMode) {
+            case LIVE_STREAM :
+                Log.d("FaceappSee", faceLandmarkerHelperListener.toString());
+                if (faceLandmarkerHelperListener == null) {
+                    Log.d("FaceappSee", "faceLandmarkerHelperListener");
+                    throw new IllegalStateException(
+                            "faceLandmarkerHelperListener must be set when runningMode is LIVE_STREAM."
+                    );
+                }
+                break;
+            default: break;
+                // no-op
+        }
+
+        try {
+            BaseOptions baseOptions = baseOptionBuilder.build();
+            
+            // Create an option builder with base options and specific
+            // options only use for Face Landmarker.
+            FaceLandmarker.FaceLandmarkerOptions.Builder optionsBuilder  =
+                    FaceLandmarker.FaceLandmarkerOptions.builder()
+                            .setBaseOptions(baseOptions)
+                            .setMinFaceDetectionConfidence(minFaceDetectionConfidence)
+                            .setMinTrackingConfidence(minFaceTrackingConfidence)
+                            .setMinFacePresenceConfidence(minFacePresenceConfidence)
+                            .setNumFaces(maxNumFaces)
+                            .setOutputFaceBlendshapes(true)
+                            .setRunningMode(runningMode);
+
+            // The ResultListener and ErrorListener only use for LIVE_STREAM mode.
+            if (runningMode == RunningMode.LIVE_STREAM) {
+                optionsBuilder
+                        .setResultListener(this::returnLivestreamResult)
+                        .setErrorListener(this::returnLivestreamError);
+            }
+
+            FaceLandmarker.FaceLandmarkerOptions options = optionsBuilder.build();
+            faceLandmarker =
+                    FaceLandmarker.createFromOptions(context, options);
+        } catch (IllegalStateException e) {
+            faceLandmarkerHelperListener.onError(
+                    "Face Landmarker failed to initialize. See error logs for " +
+                            "details", GPU_ERROR
+            );
+            Log.e("FaceappSee", "MediaPipe failed to load the task with error: " + e.toString());
+        } catch (RuntimeException e) {
+            // This occurs if the model being used does not support GPU
+            faceLandmarkerHelperListener.onError(
+                    "Face Landmarker failed to initialize. See error logs for " +
+                            "details", GPU_ERROR
+            );
+            Log.e("FaceappSee", "Face Landmarker failed to load model with error: " + e.toString());
+        }
     }
 
     public void detectLiveStream(@NotNull ImageProxy imageProxy, boolean isFrontCamera) {
